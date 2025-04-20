@@ -2,81 +2,80 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import requests
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
-st.set_page_config(page_title="Air Pollution AI", layout="centered")
+st.set_page_config(page_title="🌍 AI Air Pollution Predictor", layout="centered")
 
 st.title("🌫️ Air Pollution Level Predictor")
-st.write("Built by Rahul – Predict PM2.5 based on temperature, traffic, and industrial activity.")
+st.markdown("Predict AQI (Air Quality Index) based on temperature, traffic, and industrial activity using a machine learning model.")
 
-# ----------- DUMMY DATASET -----------
-@st.cache_data
-def generate_data():
-    np.random.seed(42)
-    data = {
-        'temperature': np.random.normal(30, 5, 100),
-        'traffic_level': np.random.randint(1, 10, 100),
-        'industrial_activity': np.random.randint(1, 10, 100)
-    }
-    df = pd.DataFrame(data)
-    df['pm25'] = (
-        0.5 * df['temperature']
-        + 2 * df['traffic_level']
-        + 3 * df['industrial_activity']
-        + np.random.normal(0, 5, 100)
-    )
-    return df
+# ----------------------------
+# 1. Simulated Dataset
+# ----------------------------
+np.random.seed(42)
+temperature = np.random.randint(15, 45, 200)
+traffic = np.random.randint(1, 11, 200)
+industry = np.random.randint(1, 11, 200)
+aqi = 0.5 * temperature + 5 * traffic + 4 * industry + np.random.normal(0, 10, 200)
 
-df = generate_data()
+data = pd.DataFrame({
+    "Temperature (°C)": temperature,
+    "Traffic Level": traffic,
+    "Industrial Activity": industry,
+    "Air Quality Index": aqi
+})
 
-# ----------- MODEL TRAINING -----------
-X = df[['temperature', 'traffic_level', 'industrial_activity']]
-y = df['pm25']
+# ----------------------------
+# 2. Train the Model
+# ----------------------------
+X = data[["Temperature (°C)", "Traffic Level", "Industrial Activity"]]
+y = data["Air Quality Index"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
 model = LinearRegression()
-model.fit(X, y)
+model.fit(X_train, y_train)
 
-# ----------- SIDEBAR INPUTS -----------
-st.sidebar.header("Adjust Inputs for Prediction")
-temperature = st.sidebar.slider("🌡️ Temperature (°C)", 0, 50, 30)
-traffic = st.sidebar.slider("🚗 Traffic Level (1-10)", 1, 10, 5)
-industry = st.sidebar.slider("🏭 Industrial Activity (1-10)", 1, 10, 5)
+# ----------------------------
+# 3. Evaluate Model
+# ----------------------------
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
 
-input_data = np.array([[temperature, traffic, industry]])
-prediction = model.predict(input_data)[0]
+# ----------------------------
+# 4. Sidebar Inputs
+# ----------------------------
+st.sidebar.header("🔧 Input Parameters")
+input_temp = st.sidebar.slider("🌡️ Temperature (°C)", 10, 50, 30)
+input_traffic = st.sidebar.slider("🚗 Traffic Level (1-10)", 1, 10, 5)
+input_industry = st.sidebar.slider("🏭 Industrial Activity (1-10)", 1, 10, 5)
 
-st.subheader("📊 Predicted PM2.5 Level")
-st.metric(label="μg/m³", value=f"{prediction:.2f}")
+# ----------------------------
+# 5. Make Prediction
+# ----------------------------
+input_data = np.array([[input_temp, input_traffic, input_industry]])
+predicted_aqi = model.predict(input_data)[0]
 
-# ----------- LIVE AIR QUALITY API -----------
-st.subheader("🌍 Live PM2.5 from a Real City")
-city = st.text_input("Enter city name (e.g. Delhi, Mumbai, London)", "Delhi")
+st.subheader("📈 Predicted Air Quality Index")
+st.success(f"🌬️ **{predicted_aqi:.2f} AQI** (based on your inputs)")
 
-if city:
-    try:
-        url = f"https://api.openaq.org/v2/latest?city={city}&parameter=pm25"
-        response = requests.get(url).json()
-        live_pm = response['results'][0]['measurements'][0]['value']
-        unit = response['results'][0]['measurements'][0]['unit']
-        st.success(f"Live PM2.5 in {city}: {live_pm} {unit}")
-    except Exception as e:
-        st.error("Couldn't fetch data. Try a valid city.")
-
-# ----------- CHART -----------
-st.subheader("📈 Prediction Chart Based on Traffic")
-traffic_range = np.arange(1, 11)
-predicted_pm25 = [
-    model.predict([[temperature, t, industry]])[0] for t in traffic_range
-]
-
+# ----------------------------
+# 6. Visualization
+# ----------------------------
+st.subheader("📊 Actual vs Predicted (Test Set)")
 fig, ax = plt.subplots()
-ax.plot(traffic_range, predicted_pm25, marker='o', color='orange')
-ax.set_xlabel("Traffic Level")
-ax.set_ylabel("Predicted PM2.5 (µg/m³)")
-ax.set_title("Effect of Traffic on PM2.5")
+ax.scatter(y_test, y_pred, alpha=0.6, color='green')
+ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
+ax.set_xlabel("Actual AQI")
+ax.set_ylabel("Predicted AQI")
 st.pyplot(fig)
 
-# ----------- OPTIONAL: SHOW RAW DATA -----------
-if st.checkbox("🔍 Show Training Data"):
-    st.write(df.head())
+# ----------------------------
+# 7. Metrics
+# ----------------------------
+st.markdown("### 🧠 Model Performance")
+st.write(f"**R² Score:** {r2:.2f}")
+st.write(f"**Mean Squared Error:** {mse:.2f}")
