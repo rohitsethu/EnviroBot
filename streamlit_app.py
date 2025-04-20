@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 st.set_page_config(page_title="Air Pollution AI", layout="centered")
 
 st.title("🌫️ Air Pollution Level Predictor")
-st.write("Built by Rahul – Predict PM2.5 based on real-world factors and live city data.")
+st.write("Built by Rahul – Predict PM2.5 based on temperature, traffic, and industrial activity.")
 
 # ----------- DUMMY DATASET -----------
 @st.cache_data
@@ -74,14 +74,9 @@ fig, ax = plt.subplots()
 ax.plot(traffic_range, predicted_pm25, marker='o', color='orange')
 ax.set_xlabel("Traffic Level")
 ax.set_ylabel("Predicted PM2.5 (µg/m³)")
-ax.set_title("Effect of Traffic on PM2.5 at fixed Temp & Industry")
+ax.set_title("Effect of Traffic on PM2.5")
 st.pyplot(fig)
 
 # ----------- OPTIONAL: SHOW RAW DATA -----------
 if st.checkbox("🔍 Show Training Data"):
     st.write(df.head())
-pip install streamlit pandas numpy matplotlib scikit-learn requests
-streamlit run streamlit_app.py
-
-
-
