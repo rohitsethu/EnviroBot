@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import altair as alt
 
-# --- API Key (Keep this secure in a real deployment) ---
+
 API_KEY = "df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"
 
 def get_air_quality(city_name, api_key=API_KEY):
