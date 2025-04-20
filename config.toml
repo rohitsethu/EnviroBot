@@ -1,0 +1,2 @@
+[ui]
+debounce_frontend_render = false
