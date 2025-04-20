@@ -3,6 +3,36 @@ import pandas as pd
 import numpy as np
 import requests
 import json
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+
+# --- Function to load and preprocess historical data ---
+@st.cache_data
+def load_and_preprocess_data(delhi_data_path, dubai_data_path):
+    try:
+        delhi_df = pd.read_csv(delhi_data_path)
+        print("Delhi DataFrame loaded successfully:")
+        print(delhi_df.head())
+        dubai_df = pd.read_csv(dubai_data_path)
+        print("\nDubai DataFrame loaded successfully:")
+        print(dubai_df.head())
+        # --- Assuming your historical data has columns like 'Temperature', 'Traffic Level', 'Industrial Activity', 'Air Quality Index' ---
+        # --- You might need to adjust these column names based on your actual data ---
+        combined_df = pd.concat([delhi_df, dubai_df], ignore_index=True)
+        X = combined_df[["Temperature", "Traffic Level", "Industrial Activity"]].dropna()
+        y = combined_df["Air Quality Index"].dropna()
+        return train_test_split(X, y, test_size=0.2, random_state=42)
+    except FileNotFoundError:
+        st.error("Error: Historical data files not found.")
+        return None, None, None, None
+    except KeyError as e:
+        st.error(f"Error: Column not found in historical data: {e}")
+        return None, None, None, None
+    except Exception as e:
+        st.error(f"Error loading or processing historical data: {e}")
+        return None, None, None, None
 
 # --- Function to fetch current data from aqi.in API ---
 def get_current_data_aqi_in(city_name="Dubai", api_key="df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"):
@@ -35,7 +65,7 @@ def get_current_data_aqi_in(city_name="Dubai", api_key="df7ead2b880e18ef32c2e0d1
         st.error(f"Error decoding JSON response from aqi.in: {e}")
         return None
 
-# --- Rest of your Streamlit code remains the same, but ensure you are calling this updated function ---
+# --- Streamlit App ---
 st.set_page_config(page_title="AI Air Pollution Predictor", layout="centered")
 st.title("AI Air Pollution Level Predictor")
 st.markdown("Predict AQI (Air Quality Index) based on temperature, traffic, and industrial activity using a machine learning model trained on historical data and current data from aqi.in.")
@@ -50,7 +80,6 @@ if X_train is not None:
 
     # --- Fetch current data from aqi.in and make prediction ---
     st.sidebar.header("Current Conditions (Dubai)")
-    # --- We can now directly use the API key in the function ---
     current_data = get_current_data_aqi_in(city_name="Dubai")
     if current_data is not None:
         # --- Handle cases where temperature might not be available ---
@@ -72,6 +101,12 @@ if X_train is not None:
     ax.set_xlabel("Actual AQI")
     ax.set_ylabel("Predicted AQI")
     st.pyplot(fig)
+
+    st.markdown("### Model Performance (on Test Data)")
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    st.write(f"**R² Score:** {r2:.2f}")
+    st.write(f"**Mean Squared Error:** {mse:.2f}")
 
 else:
     st.warning("Please ensure historical data files are available.")
