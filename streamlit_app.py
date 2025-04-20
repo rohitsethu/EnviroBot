@@ -4,8 +4,8 @@ import json
 import pandas as pd
 import altair as alt
 
-# --- API Key (Keep this secure in a real deployment) ---
-API_KEY = "YOUR_API_KEY"  # Replace with your actual API key if needed
+# --- API Key ---
+API_KEY = "df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"
 
 def get_air_quality(city_name, api_key=API_KEY):
     base_url = "https://api.waqi.info/feed/"
@@ -34,9 +34,9 @@ def get_air_quality(city_name, api_key=API_KEY):
                         break # Assuming we found the first significant pollutant
 
                 # --- Alternative: Check for a specific 'dominant' field (if the API provides one) ---
-                # if "dominantpol" in data["data"]:
-                #     dominant_pollutant_name = data["data"]["dominantpol"].upper()
-                #     # You might need to fetch the value separately if it's not directly provided here
+                if "dominantpol" in data["data"]:
+                    dominant_pollutant_name = data["data"]["dominantpol"].upper()
+                    # You might need to fetch the value separately if it's not directly provided here
 
             return aqi, temperature, dominant_pollutant_name, dominant_pollutant_value
         else:
@@ -65,7 +65,7 @@ def get_aqi_category(aqi):
 
 st.set_page_config(page_title="EnviroBot", layout="wide")
 
-# --- Background Image (using CSS injection) ---
+# --- Background Image for the whole app ---
 def set_background(image_url):
     st.markdown(
         f"""
@@ -87,40 +87,70 @@ set_background(background_image_url)
 # --- Sidebar for Navigation ---
 with st.sidebar:
     st.title("EnviroBot")
-    st.markdown("By Rohit")
-    st.markdown("---")
-    st.subheader("Select Location")
     locations = ["Dubai", "Delhi", "London", "Beijing", "New York"] # Add more locations as needed
-    selected_location_sidebar = st.selectbox("Choose a City:", locations, index=0) # Default to Dubai (index 0)
+    selected_location_sidebar = st.selectbox("Choose a City:", [""] + locations) # Empty string for default
 
     st.markdown("---")
-    st.markdown("Optional Sidebar Content")
-    # You can add more widgets or information here in the sidebar
+    st.subheader("Chatbot")
+    st.markdown("*Under Development*")
 
 # --- Main Content Area ---
-st.title("EnviroBot")
-st.markdown("By Rohit")
-st.markdown("---")
+st.markdown(
+    """
+    <style>
+    .title-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 80vh; /* Adjust as needed for vertical centering */
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black background */
+        color: white; /* White text color */
+        padding: 20px;
+        border-radius: 10px; /* Optional rounded corners */
+    }
+    .by-rohit {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        font-size: 0.8em;
+        color: white; /* White text color */
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black background */
+        padding: 5px;
+        border-radius: 5px; /* Optional rounded corners */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-st.subheader(f"Real-time Air Quality in {selected_location_sidebar}")
-city_param = selected_location_sidebar.lower().replace(" ", "-")
-aqi, temp, pollutant_name, pollutant_value = get_air_quality(city_param)
-
-if aqi is not None:
-    category, color = get_aqi_category(aqi)
-    st.metric(label="AQI", value=aqi)
-    st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-    if temp is not None:
-        st.metric("Temperature (°C)", value=temp)
-    if pollutant_name:
-        if pollutant_value is not None:
-            st.caption(f"Dominant Pollutant: {pollutant_name} ({pollutant_value:.2f})")
-        else:
-            st.caption(f"Dominant Pollutant: {pollutant_name}")
+if not st.session_state.get("location_selected"):
+    st.markdown('<div class="title-container"><h1>EnviroBot</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="by-rohit">By Rohit</div>', unsafe_allow_html=True)
 else:
-    st.error(f"Could not retrieve current data for {selected_location_sidebar}.")
+    st.subheader(f"Real-time Air Quality in {st.session_state.selected_location}")
+    city_param = st.session_state.selected_location.lower().replace(" ", "-")
+    aqi, temp, pollutant_name, pollutant_value = get_air_quality(city_param)
 
-st.markdown("---")
-st.markdown("Additional Main Page Content")
-# You can add more visualizations or information below the main data
+    if aqi is not None:
+        category, color = get_aqi_category(aqi)
+        st.metric(label="AQI", value=aqi)
+        st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
+        if temp is not None:
+            st.metric("Temperature (°C)", value=temp)
+        if pollutant_name:
+            if pollutant_value is not None:
+                st.caption(f"Dominant Pollutant: {pollutant_name} ({pollutant_value:.2f})")
+            else:
+                st.caption(f"Dominant Pollutant: {pollutant_name}")
+    else:
+        st.error(f"Could not retrieve current data for {st.session_state.selected_location}.")
+
+# --- Update session state when a location is selected ---
+if st.sidebar.selectbox("Choose a City:", [""] + locations, key="location_select_sidebar"):
+    st.session_state["location_selected"] = True
+    st.session_state["selected_location"] = st.session_state.location_select_sidebar
+    st.rerun()
+elif "location_selected" in st.session_state and st.session_state["selected_location"] == "":
+    del st.session_state["location_selected"]
+    st.rerun()
 
