@@ -3,36 +3,6 @@ import pandas as pd
 import numpy as np
 import requests
 import json
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt
-
-# --- Function to load and preprocess historical data ---
-@st.cache_data
-def load_and_preprocess_data(delhi_data_path, dubai_data_path):
-    try:
-        delhi_df = pd.read_csv(delhi_data_path)
-        print("Delhi DataFrame loaded successfully:")
-        print(delhi_df.head())
-        dubai_df = pd.read_csv(dubai_data_path)
-        print("\nDubai DataFrame loaded successfully:")
-        print(dubai_df.head())
-        # --- Assuming your historical data has columns like 'Temperature', 'Traffic Level', 'Industrial Activity', 'Air Quality Index' ---
-        # --- You might need to adjust these column names based on your actual data ---
-        combined_df = pd.concat([delhi_df, dubai_df], ignore_index=True)
-        X = combined_df[["Temperature", "Traffic Level", "Industrial Activity"]].dropna()
-        y = combined_df["Air Quality Index"].dropna()
-        return train_test_split(X, y, test_size=0.2, random_state=42)
-    except FileNotFoundError:
-        st.error("Error: Historical data files not found.")
-        return None, None, None, None
-    except KeyError as e:
-        st.error(f"Error: Column not found in historical data: {e}")
-        return None, None, None, None
-    except Exception as e:
-        st.error(f"Error loading or processing historical data: {e}")
-        return None, None, None, None
 
 # --- Function to fetch current data from aqi.in API ---
 def get_current_data_aqi_in(city_name="Dubai", api_key="df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"):
@@ -49,10 +19,9 @@ def get_current_data_aqi_in(city_name="Dubai", api_key="df7ead2b880e18ef32c2e0d1
             if "iaqi" in data["data"] and "t" in data["data"]["iaqi"]:
                 current_temp = data["data"]["iaqi"]["t"]["v"]
 
-            # Placeholders for traffic and industry - you'll need to find
-            # alternative data sources or methods if you want to include these
-            current_traffic = st.session_state.get("current_traffic", 5)
-            current_industry = st.session_state.get("current_industry", 5)
+            # Placeholders for traffic and industry - aqi.in doesn't provide these
+            current_traffic = 5
+            current_industry = 5
 
             return np.array([[current_temp, current_traffic, current_industry]])
         else:
@@ -66,47 +35,48 @@ def get_current_data_aqi_in(city_name="Dubai", api_key="df7ead2b880e18ef32c2e0d1
         return None
 
 # --- Streamlit App ---
-st.set_page_config(page_title="AI Air Pollution Predictor", layout="centered")
-st.title("AI Air Pollution Level Predictor")
-st.markdown("Predict AQI (Air Quality Index) based on temperature, traffic, and industrial activity using a machine learning model trained on historical data and current data from aqi.in.")
+st.set_page_config(page_title="Real-time AI Air Pollution Predictor (Dubai)", layout="centered")
+st.title("Real-time AI Air Pollution Predictor (Dubai)")
+st.markdown("Predict AQI based on current temperature (from aqi.in) and placeholder values for traffic and industrial activity.")
+st.markdown("This version does not use historical data for training.")
 
-# --- Load and preprocess historical data ---
-X_train, X_test, y_train, y_test = load_and_preprocess_data("delhi_air_quality.csv", "dubai_air_quality.csv") # Replace with your actual file paths
+# --- Fetch current data from aqi.in and "predict" ---
+st.sidebar.header("Current Conditions (Dubai)")
+current_data = get_current_data_aqi_in(city_name="Dubai")
 
-if X_train is not None:
-    # --- Train the model ---
-    model = LinearRegression() # You can change this to a different model
-    model.fit(X_train, y_train)
+if current_data is not None:
+    current_temp = current_data[0][0]
+    placeholder_traffic = current_data[0][1]
+    placeholder_industry = current_data[0][2]
 
-    # --- Fetch current data from aqi.in and make prediction ---
-    st.sidebar.header("Current Conditions (Dubai)")
-    current_data = get_current_data_aqi_in(city_name="Dubai")
-    if current_data is not None:
-        # --- Handle cases where temperature might not be available ---
-        if current_data[0][0] is not None:
-            try:
-                predicted_aqi = model.predict(current_data)[0]
-                st.subheader("Predicted Air Quality Index (Current - Dubai)")
-                st.success(f" **{predicted_aqi:.2f} AQI**")
-            except Exception as e:
-                st.error(f"Error making prediction: {e}")
+    st.subheader("Current Conditions Retrieved from aqi.in:")
+    if current_temp is not None:
+        st.write(f"🌡️ Temperature: {current_temp}°C")
+    else:
+        st.warning("Temperature data not currently available from aqi.in.")
+    st.write(f"🚗 Traffic Level (Placeholder): {placeholder_traffic} (Note: Real data not available from aqi.in)")
+    st.write(f"🏭 Industrial Activity (Placeholder): {placeholder_industry} (Note: Real data not available from aqi.in)")
+
+    # --- Since we don't have a trained model, we can only display the fetched AQI ---
+    # --- You would need a pre-trained model or a different approach to make a prediction ---
+    # --- based on temperature (if that's the only reliable real-time data you have) ---
+
+    # Attempt to get the current AQI directly from the API response
+    base_url = "https://api.waqi.info/feed/"
+    api_key = "df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"
+    url = f"{base_url}dubai/?token={api_key}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        if data["status"] == "ok":
+            current_aqi_from_api = data["data"]["aqi"]
+            st.subheader("Current Air Quality Index (from aqi.in):")
+            st.success(f" **{current_aqi_from_api} AQI**")
         else:
-            st.warning("Temperature data not available from aqi.in. Prediction might be less accurate.")
-
-    # --- Optionally keep the Actual vs Predicted plot ---
-    st.subheader("Actual vs Predicted (Test Set)")
-    fig, ax = plt.subplots()
-    ax.scatter(y_test, y_pred, alpha=0.6, color='green')
-    ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
-    ax.set_xlabel("Actual AQI")
-    ax.set_ylabel("Predicted AQI")
-    st.pyplot(fig)
-
-    st.markdown("### Model Performance (on Test Data)")
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    st.write(f"**R² Score:** {r2:.2f}")
-    st.write(f"**Mean Squared Error:** {mse:.2f}")
+            st.error(f"Error fetching AQI from aqi.in: {data['message']}")
+    except Exception as e:
+        st.error(f"Error fetching AQI: {e}")
 
 else:
-    st.warning("Please ensure historical data files are available.")
+    st.error("Failed to retrieve current data from aqi.in.")
