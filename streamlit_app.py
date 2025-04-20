@@ -155,6 +155,5 @@ elif choice == "More Locations":
 
 elif choice == "AI Chat":
     st.subheader("AI Chatbot for Air Quality Info")
-    st.markdown("This is a placeholder for a future AI chatbot.")
-    st.markdown("You could integrate a language model here to answer questions about air quality, pollutants, health impacts, etc.")
-    st.markdown("*(AI chatbot functionality needs further implementation.)*")
+    st.markdown("Under Development.")
+
