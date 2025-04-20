@@ -4,57 +4,64 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+
+# --- Function to load and preprocess historical data ---
+@st.cache_data
+def load_and_preprocess_data(delhi_data_path, dubai_data_path):
+    try:
+        delhi_df = pd.read_csv(delhi_data_path)
+        dubai_df = pd.read_csv(dubai_data_path)
+        # --- Data cleaning, feature selection, and merging ---
+        # This will depend heavily on the structure of your data
+        combined_df = pd.concat([delhi_df, dubai_df], ignore_index=True)
+        # --- Select relevant features and target variable ---
+        X = combined_df[["temperature", "traffic_proxy", "industry_proxy"]] # Rename based on your actual columns
+        y = combined_df["aqi"] # Rename based on your actual column
+        return train_test_split(X, y, test_size=0.2, random_state=42)
+    except FileNotFoundError:
+        st.error("Error: Historical data files not found.")
+        return None, None, None, None
+
+# --- Function to fetch current data (Conceptual) ---
+def get_current_data():
+    # --- Replace this with your actual API calls ---
+    # Example using a placeholder:
+    current_temp = 35 # Replace with actual API call
+    current_traffic = 7 # Replace with actual API call (if available)
+    current_industry = 6 # Replace with actual API call (if available)
+    return np.array([[current_temp, current_traffic, current_industry]])
 
 st.set_page_config(page_title="AI Air Pollution Predictor", layout="centered")
+st.title("AI Air Pollution Level Predictor")
+st.markdown("Predict AQI (Air Quality Index) based on temperature, traffic, and industrial activity using a machine learning model trained on historical data from Delhi and Dubai and current data.")
 
-st.title("Air Pollution Level Predictor")
-st.markdown("Predict AQI (Air Quality Index) based on temperature, traffic, and industrial activity using a machine learning model.")
+# --- Load and preprocess historical data ---
+X_train, X_test, y_train, y_test = load_and_preprocess_data("delhi_air_quality.csv", "dubai_air_quality.csv") # Replace with your actual file paths
 
-np.random.seed(42)
-temperature = np.random.randint(15, 45, 200)
-traffic = np.random.randint(1, 11, 200)
-industry = np.random.randint(1, 11, 200)
-aqi = 0.5 * temperature + 5 * traffic + 4 * industry + np.random.normal(0, 10, 200)
+if X_train is not None:
+    # --- Train the model ---
+    model = LinearRegression() # You can change this to a different model
+    model.fit(X_train, y_train)
 
-data = pd.DataFrame({
-    "Temperature (°C)": temperature,
-    "Traffic Level": traffic,
-    "Industrial Activity": industry,
-    "Air Quality Index": aqi
-})
+    # --- Fetch current data and make prediction ---
+    st.sidebar.header("Current Conditions (Dubai)")
+    current_data = get_current_data()
+    if current_data is not None:
+        try:
+            predicted_aqi = model.predict(current_data)[0]
+            st.subheader("Predicted Air Quality Index (Current - Dubai)")
+            st.success(f" **{predicted_aqi:.2f} AQI**")
+        except Exception as e:
+            st.error(f"Error making prediction: {e}")
 
-X = data[["Temperature (°C)", "Traffic Level", "Industrial Activity"]]
-y = data["Air Quality Index"]
+    # --- Optionally keep the Actual vs Predicted plot if you find it useful for debugging ---
+    st.subheader("Actual vs Predicted (Test Set)")
+    fig, ax = plt.subplots()
+    ax.scatter(y_test, y_pred, alpha=0.6, color='green')
+    ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
+    ax.set_xlabel("Actual AQI")
+    ax.set_ylabel("Predicted AQI")
+    st.pyplot(fig)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-model = LinearRegression()
-model.fit(X_train, y_train)
-
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
-
-st.sidebar.header("Input Parameters")
-input_temp = st.sidebar.slider("🌡️ Temperature (°C)", 10, 50, 30)
-input_traffic = st.sidebar.slider("🚗 Traffic Level (1-10)", 1, 10, 5)
-input_industry = st.sidebar.slider("🏭 Industrial Activity (1-10)", 1, 10, 5)
-
-input_data = np.array([[input_temp, input_traffic, input_industry]])
-predicted_aqi = model.predict(input_data)[0]
-
-st.subheader("Predicted Air Quality Index")
-st.success(f" **{predicted_aqi:.2f} AQI** (based on your inputs)")
-
-st.subheader("Actual vs Predicted (Test Set)")
-fig, ax = plt.subplots()
-ax.scatter(y_test, y_pred, alpha=0.6, color='green')
-ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')
-ax.set_xlabel("Actual AQI")
-ax.set_ylabel("Predicted AQI")
-st.pyplot(fig)
-
-st.markdown("### Model Performance")
-st.write(f"**R² Score:** {r2:.2f}")
-st.write(f"**Mean Squared Error:** {mse:.2f}")
+else:
+    st.warning("Please ensure historical data files are available.")
