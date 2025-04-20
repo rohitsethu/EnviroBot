@@ -4,8 +4,8 @@ import json
 import pandas as pd
 import altair as alt
 
-
-API_KEY = "df7ead2b880e18ef32c2e0d12d4c50fcbb505dc4"
+# --- API Key (Keep this secure in a real deployment) ---
+API_KEY = "YOUR_API_KEY"  # Replace with your actual API key if needed
 
 def get_air_quality(city_name, api_key=API_KEY):
     base_url = "https://api.waqi.info/feed/"
@@ -17,22 +17,37 @@ def get_air_quality(city_name, api_key=API_KEY):
         if data["status"] == "ok":
             aqi = data["data"]["aqi"]
             temperature = None
-            dominant_pollutant = None
+            dominant_pollutant_name = None
+            dominant_pollutant_value = None
+
             if "iaqi" in data["data"]:
                 if "t" in data["data"]["iaqi"]:
                     temperature = data["data"]["iaqi"]["t"]["v"]
-                if "p" in data["data"]["iaqi"]:
-                    dominant_pollutant = data["data"]["iaqi"]["p"]["v"]
-            return aqi, temperature, dominant_pollutant
+
+                # --- Attempt to find a key that might represent the dominant pollutant ---
+                # --- Inspect the API response to adjust these keys ---
+                potential_pollutants = ["pm25", "pm10", "o3", "no2", "co", "so2"]
+                for pollutant_key in potential_pollutants:
+                    if pollutant_key in data["data"]["iaqi"] and "v" in data["data"]["iaqi"][pollutant_key]:
+                        dominant_pollutant_name = pollutant_key.upper() # Use the key as the name
+                        dominant_pollutant_value = data["data"]["iaqi"][pollutant_key]["v"]
+                        break # Assuming we found the first significant pollutant
+
+                # --- Alternative: Check for a specific 'dominant' field (if the API provides one) ---
+                # if "dominantpol" in data["data"]:
+                #     dominant_pollutant_name = data["data"]["dominantpol"].upper()
+                #     # You might need to fetch the value separately if it's not directly provided here
+
+            return aqi, temperature, dominant_pollutant_name, dominant_pollutant_value
         else:
             st.error(f"Error fetching data for {city_name}: {data['message']}")
-            return None, None, None
+            return None, None, None, None
     except requests.exceptions.RequestException as e:
         st.error(f"Error connecting to API for {city_name}: {e}")
-        return None, None, None
+        return None, None, None, None
     except json.JSONDecodeError as e:
         st.error(f"Error decoding JSON for {city_name}: {e}")
-        return None, None, None
+        return None, None, None, None
 
 def get_aqi_category(aqi):
     if aqi <= 50:
@@ -48,112 +63,64 @@ def get_aqi_category(aqi):
     else:
         return "Severe", "darkred"
 
-st.set_page_config(page_title="Air Quality Dashboard", layout="wide")
-st.title("Air Quality Dashboard")
+st.set_page_config(page_title="EnviroBot", layout="wide")
 
-menu = ["Dubai", "Delhi", "Comparison", "More Locations", "AI Chat"]
-choice = st.sidebar.selectbox("Navigation", menu)
+# --- Background Image (using CSS injection) ---
+def set_background(image_url):
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("{image_url}");
+            background-attachment: fixed;
+            background-size: cover;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-if choice == "Dubai":
-    st.subheader("🇦🇪 Real-time Air Quality in Dubai")
-    aqi, temp, pollutant = get_air_quality("dubai")
-    if aqi is not None:
-        category, color = get_aqi_category(aqi)
-        st.metric(label="AQI", value=aqi, delta=f"({category})", delta_color="normal")
-        st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-        if temp is not None:
-            st.metric("Temperature (°C)", value=temp)
-        if pollutant:
-            st.caption(f"Dominant Pollutant: {pollutant}")
-    else:
-        st.error("Could not retrieve current data for Dubai.")
+# Replace with the URL of your desired background image
+background_image_url = "https://images.unsplash.com/photo-1552733407-5d5c46c3bb03?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MTd8fGJsYW5rfGVufDB8fDB8fA%3D%3D&auto=format&fit=crop&w=800&q=60" # Example URL
+set_background(background_image_url)
 
-elif choice == "Delhi":
-    st.subheader("🇮🇳 Real-time Air Quality in Delhi")
-    aqi, temp, pollutant = get_air_quality("delhi")
-    if aqi is not None:
-        category, color = get_aqi_category(aqi)
-        st.metric(label="AQI", value=aqi, delta=f"({category})", delta_color="normal")
-        st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-        if temp is not None:
-            st.metric("Temperature (°C)", value=temp)
-        if pollutant:
-            st.caption(f"Dominant Pollutant: {pollutant}")
-    else:
-        st.error("Could not retrieve current data for Delhi.")
-
-elif choice == "Comparison":
-    st.subheader("Air Quality Comparison: Dubai vs. Delhi")
-    dubai_col, delhi_col = st.columns(2)
-
-    with dubai_col:
-        st.markdown("### 🇦🇪 Dubai")
-        dubai_aqi, dubai_temp, dubai_pollutant = get_air_quality("dubai")
-        if dubai_aqi is not None:
-            category, color = get_aqi_category(dubai_aqi)
-            st.metric(label="AQI", value=dubai_aqi, delta=f"({category})", delta_color="normal")
-            st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-            if dubai_temp is not None:
-                st.metric("Temperature (°C)", value=dubai_temp)
-            if dubai_pollutant:
-                st.caption(f"Dominant Pollutant: {dubai_pollutant}")
-        else:
-            st.error("Could not retrieve current data for Dubai.")
-
-    with delhi_col:
-        st.markdown("### 🇮🇳 Delhi")
-        delhi_aqi, delhi_temp, delhi_pollutant = get_air_quality("delhi")
-        if delhi_aqi is not None:
-            category, color = get_aqi_category(delhi_aqi)
-            st.metric(label="AQI", value=delhi_aqi, delta=f"({category})", delta_color="normal")
-            st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-            if delhi_temp is not None:
-                st.metric("Temperature (°C)", value=delhi_temp)
-            if delhi_pollutant:
-                st.caption(f"Dominant Pollutant: {pollutant}")
-        else:
-            st.error("Could not retrieve current data for Delhi.")
+# --- Sidebar for Navigation ---
+with st.sidebar:
+    st.title("EnviroBot")
+    st.markdown("By Rohit")
+    st.markdown("---")
+    st.subheader("Select Location")
+    locations = ["Dubai", "Delhi", "London", "Beijing", "New York"] # Add more locations as needed
+    selected_location_sidebar = st.selectbox("Choose a City:", locations, index=0) # Default to Dubai (index 0)
 
     st.markdown("---")
-    st.subheader("Comparison Insights:")
-    if dubai_aqi is not None and delhi_aqi is not None:
-        if dubai_aqi < delhi_aqi:
-            st.success(f"The current AQI in Dubai ({dubai_aqi}) is better than in Delhi ({delhi_aqi}).")
-        elif delhi_aqi < dubai_aqi:
-            st.warning(f"The current AQI in Delhi ({delhi_aqi}) is worse than in Dubai ({dubai_aqi}).")
-        else:
-            st.info(f"The current AQI in Dubai ({dubai_aqi}) and Delhi ({delhi_aqi}) is similar.")
-    else:
-        st.info("Cannot compare AQI as data for one or both cities is unavailable.")
+    st.markdown("Optional Sidebar Content")
+    # You can add more widgets or information here in the sidebar
 
-    if dubai_temp is not None and delhi_temp is not None:
-        if dubai_temp > delhi_temp:
-            st.success(f"Dubai is currently warmer ({dubai_temp}°C) than Delhi ({delhi_temp}°C).")
-        elif delhi_temp > dubai_temp:
-            st.info(f"Delhi is currently warmer ({delhi_temp}°C) than Dubai ({dubai_temp}°C).")
-        else:
-            st.info(f"Dubai and Delhi have a similar temperature ({dubai_temp}°C).")
-    else:
-        st.info("Cannot compare temperature as data for one or both cities is unavailable.")
+# --- Main Content Area ---
+st.title("EnviroBot")
+st.markdown("By Rohit")
+st.markdown("---")
 
-elif choice == "More Locations":
-    st.subheader("Explore Air Quality in Other Locations")
-    location = st.text_input("Enter city name (e.g., London, Beijing):")
-    if location:
-        aqi, temp, pollutant = get_air_quality(location.lower().replace(" ", "-")) # API uses lowercase with hyphens
-        st.markdown(f"### {location.capitalize()}")
-        if aqi is not None:
-            category, color = get_aqi_category(aqi)
-            st.metric(label="AQI", value=aqi, delta=f"({category})", delta_color="normal")
-            st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
-            if temp is not None:
-                st.metric("Temperature (°C)", value=temp)
-            if pollutant:
-                st.caption(f"Dominant Pollutant: {pollutant}")
-        else:
-            st.error(f"Could not retrieve current data for {location}.")
+st.subheader(f"Real-time Air Quality in {selected_location_sidebar}")
+city_param = selected_location_sidebar.lower().replace(" ", "-")
+aqi, temp, pollutant_name, pollutant_value = get_air_quality(city_param)
 
-elif choice == "AI Chat":
-    st.subheader("AI Chatbot for Air Quality Info")
-    st.markdown("Under Development.")
+if aqi is not None:
+    category, color = get_aqi_category(aqi)
+    st.metric(label="AQI", value=aqi)
+    st.markdown(f"<span style='color: {color}; font-size: 0.9em;'>{category}</span>", unsafe_allow_html=True)
+    if temp is not None:
+        st.metric("Temperature (°C)", value=temp)
+    if pollutant_name:
+        if pollutant_value is not None:
+            st.caption(f"Dominant Pollutant: {pollutant_name} ({pollutant_value:.2f})")
+        else:
+            st.caption(f"Dominant Pollutant: {pollutant_name}")
+else:
+    st.error(f"Could not retrieve current data for {selected_location_sidebar}.")
+
+st.markdown("---")
+st.markdown("Additional Main Page Content")
+# You can add more visualizations or information below the main data
 
